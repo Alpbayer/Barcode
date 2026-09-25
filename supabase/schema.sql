@@ -16,7 +16,8 @@ create table items (
   baslik text not null,
   aciklama text,
   boyut text,                      -- opsiyonel
-  qr_code text unique,             -- Faz 2'de doldurulacak, şimdilik nullable
+  qr_code text unique,             -- kullanılmıyor (Faz 2'de Code128 barkoda geçildi)
+  barcode_value bigint generated always as identity unique, -- barkoda basılan kısa numara (Faz 2)
   created_at timestamptz default now()
 );
 

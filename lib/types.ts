@@ -13,6 +13,7 @@ export type Item = {
   aciklama: string | null;
   boyut: string | null;
   qr_code: string | null;
+  barcode_value: number;
   created_at: string;
 };
 

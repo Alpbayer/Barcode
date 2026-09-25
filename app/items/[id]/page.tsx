@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import { barcodeDataUrl } from "@/lib/barcode";
 import { createClient } from "@/lib/supabase/server";
 import type { Auction, AuctionItem, Item } from "@/lib/types";
 
@@ -21,13 +22,16 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
   if (error) throw new Error(error.message);
   if (!item) notFound();
 
+  // barcode_value sütunu yoksa (faz2_barcode.sql çalıştırılmadıysa) "undefined" barkodu basmayalım.
+  const barcode = item.barcode_value != null ? barcodeDataUrl(item.barcode_value) : null;
+
   const fields: [string, string | number | null][] = [
     ["LotNo", item.lot_no],
     ["Kategori", item.kategori],
     ["Başlık", item.baslik],
     ["Açıklama", item.aciklama],
     ["Boyut", item.boyut],
-    ["QR kod", item.qr_code],
+    ["Barkod", item.barcode_value],
     ["Oluşturulma", new Date(item.created_at).toLocaleString("tr-TR")],
   ];
 
@@ -37,6 +41,13 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
         <Link href="/items" className="text-sm text-blue-600 underline">← Ürünler</Link>
         <h1 className="text-2xl font-bold">{item.baslik}</h1>
       </div>
+
+      {barcode ? (
+        // eslint-disable-next-line @next/next/no-img-element -- data URL, next/image gereksiz
+        <img src={barcode} alt={`Barkod ${item.barcode_value}`} className="h-28 border" />
+      ) : (
+        <p className="text-sm text-red-600">Barkod numarası yok (supabase/faz2_barcode.sql çalıştırılmamış).</p>
+      )}
 
       <dl className="grid max-w-xl grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
         {fields.map(([label, value]) => (
