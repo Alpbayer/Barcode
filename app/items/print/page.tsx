@@ -43,7 +43,7 @@ export default async function PrintItemsPage({
           {labels.map((l) => (
             <div key={l.id} className="flex break-inside-avoid flex-col items-center border p-2 text-center">
               {/* eslint-disable-next-line @next/next/no-img-element -- data URL, next/image gereksiz */}
-              <img src={l.barcode} alt={`Barkod ${l.barcode_value}`} className="w-full max-w-[220px]" />
+              <img src={l.barcode} alt={`Barkod ${l.barcode_value}`} className="w-full" />
               <div className="mt-1 font-bold">{l.lot_no != null ? `#${l.lot_no}` : "-"}</div>
               <div className="text-sm">{l.baslik}</div>
             </div>

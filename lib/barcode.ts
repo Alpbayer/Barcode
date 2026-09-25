@@ -9,9 +9,11 @@ export function barcodeDataUrl(value: number | string) {
   JsBarcode(svg as unknown as SVGElement, String(value), {
     xmlDocument: doc as unknown as XMLDocument,
     format: "CODE128",
-    width: 2,
-    height: 70,
-    margin: 10,
+    width: 3,
+    height: 90,
+    // Code128 standardı her iki yanda en az 10 modül boşluk (quiet zone) ister: 10 × width.
+    // Dar olursa okuyucu yandaki görüntüyü barkodun parçası sanıp yanlış okur.
+    margin: 30,
     displayValue: true, // okunabilir sayıyı barkodun altına basar
     fontSize: 18,
   });

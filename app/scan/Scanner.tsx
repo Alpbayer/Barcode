@@ -41,12 +41,23 @@ export default function Scanner() {
   const router = useRouter();
   const [status, setStatus] = useState<Status>({ kind: "info", text: "Kamera açılıyor…" });
   const busy = useRef(false);
+  // Kameradan gelen tek bir yanlış kareye güvenmemek için aynı değeri art arda iki kez görmeyi bekliyoruz.
+  const lastRead = useRef<{ value: string; at: number } | null>(null);
 
   const handleResult = useCallback(
-    async (raw: string) => {
+    async (raw: string, confirmed = false) => {
       if (busy.current) return;
-      busy.current = true;
       const value = raw.trim();
+
+      if (!confirmed) {
+        const prev = lastRead.current;
+        const now = Date.now();
+        lastRead.current = { value, at: now };
+        if (!prev || prev.value !== value || now - prev.at > 1500) return;
+      }
+
+      busy.current = true;
+      lastRead.current = null;
       setStatus({ kind: "info", text: "Kontrol ediliyor…" });
 
       try {
@@ -92,6 +103,14 @@ export default function Scanner() {
           { facingMode: "environment" },
           {
             fps: 10,
+            // Varsayılan düşük çözünürlükte ince 1D çizgiler uzaktan seçilemiyor; yüksek çözünürlük + sürekli odak iste.
+            // Desteklemeyen cihaz "ideal" değerleri yok sayar, hata vermez.
+            videoConstraints: {
+              facingMode: "environment",
+              width: { ideal: 1920 },
+              height: { ideal: 1080 },
+              advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet],
+            },
             // 1D barkod için yatay dikdörtgen; dar ekranda genişliğe sığdır.
             qrbox: (viewfinderWidth) => {
               const width = Math.floor(Math.min(300, viewfinderWidth * 0.9));
@@ -128,7 +147,7 @@ export default function Scanner() {
     try {
       const text = await (await createScanner("reader-file")).scanFile(file, false);
       busy.current = false;
-      await handleRef.current(text);
+      await handleRef.current(text, true); // fotoğraf tek karedir; teyit beklemeye gerek yok
     } catch {
       setStatus({ kind: "error", text: "Fotoğrafta barkod bulunamadı." });
     }
