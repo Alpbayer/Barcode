@@ -22,7 +22,7 @@ export function createClient() {
             cookieStore.set(name, value, options)
           );
         } catch {
-          // Server component'ten çağrıldığında cookie yazılamaz; auth olmadığı için sorun değil.
+          // Cookies can't be set when called from a Server Component; fine since there's no auth.
         }
       },
     },

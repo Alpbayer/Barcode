@@ -19,7 +19,7 @@ export default async function PrintItemsPage({
     .from("items")
     .select("id, lot_no, baslik, barcode_value")
     .order("lot_no", { nullsFirst: false });
-  // Seçim yapıldıysa sadece onlar (geçersiz id'ler elenip liste boş kalsa bile "tümü"ne düşme).
+  // If a selection was made, show only those (don't fall back to "all" even if filtering invalid ids leaves it empty).
   if (requested.length > 0) query = query.in("id", ids);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
@@ -42,7 +42,7 @@ export default async function PrintItemsPage({
         <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 print:grid-cols-3">
           {labels.map((l) => (
             <div key={l.id} className="flex break-inside-avoid flex-col items-center border p-2 text-center">
-              {/* eslint-disable-next-line @next/next/no-img-element -- data URL, next/image gereksiz */}
+              {/* eslint-disable-next-line @next/next/no-img-element -- data URL, next/image not needed */}
               <img src={l.barcode} alt={`Barkod ${l.barcode_value}`} className="w-full" />
               <div className="mt-1 font-bold">{l.lot_no != null ? `#${l.lot_no}` : "-"}</div>
               <div className="text-sm">{l.baslik}</div>

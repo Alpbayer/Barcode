@@ -23,7 +23,7 @@ export default async function ItemsPage() {
       {items.length === 0 ? (
         <p className="text-gray-500">Henüz ürün yok.</p>
       ) : (
-        // Seçilen checkbox'lar /items/print?id=..&id=.. olarak gider (JS gerekmez).
+        // Checked boxes are submitted as /items/print?id=..&id=.. (no JS needed).
         <form action="/items/print" method="get" className="space-y-3">
           <div className="flex gap-2">
             <button className="border px-3 py-1">Seçilenleri yazdır</button>

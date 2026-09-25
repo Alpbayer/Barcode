@@ -17,12 +17,12 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
     .select("*, auction_items(*, auctions(id, name, date))")
     .eq("id", params.id)
     .maybeSingle<ItemWithAuctions>();
-  // Geçersiz uuid'de Postgres 22P02 döner; onu da 404 say.
+  // Postgres returns 22P02 for an invalid uuid; treat that as 404 too.
   if (error?.code === "22P02") notFound();
   if (error) throw new Error(error.message);
   if (!item) notFound();
 
-  // barcode_value sütunu yoksa (faz2_barcode.sql çalıştırılmadıysa) "undefined" barkodu basmayalım.
+  // If the barcode_value column is missing (faz2_barcode.sql not run), don't render an "undefined" barcode.
   const barcode = item.barcode_value != null ? barcodeDataUrl(item.barcode_value) : null;
 
   const fields: [string, string | number | null][] = [
@@ -43,7 +43,7 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
       </div>
 
       {barcode ? (
-        // eslint-disable-next-line @next/next/no-img-element -- data URL, next/image gereksiz
+        // eslint-disable-next-line @next/next/no-img-element -- data URL, next/image not needed
         <img src={barcode} alt={`Barkod ${item.barcode_value}`} className="h-28 border" />
       ) : (
         <p className="text-sm text-red-600">Barkod numarası yok (supabase/faz2_barcode.sql çalıştırılmamış).</p>

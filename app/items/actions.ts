@@ -9,8 +9,8 @@ export async function createItem(formData: FormData) {
   const baslik = str(formData, "baslik");
   if (!baslik) throw new Error("Başlık zorunlu");
 
-  // id'yi önceden üretiyoruz; redirect için insert'ten geri okumaya gerek kalmıyor.
-  // barcode_value DB'de otomatik atanır.
+  // Generate the id up front so we can redirect without reading it back from the insert.
+  // barcode_value is assigned automatically by the DB.
   const id = crypto.randomUUID();
 
   const supabase = createClient();

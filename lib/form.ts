@@ -1,4 +1,4 @@
-// FormData yardımcıları: boş string → null
+// FormData helpers: empty string → null
 export function str(fd: FormData, key: string): string | null {
   const v = String(fd.get(key) ?? "").trim();
   return v === "" ? null : v;

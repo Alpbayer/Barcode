@@ -7,17 +7,17 @@ import { findItemByBarcode } from "./actions";
 
 type Status = { kind: "info" | "error"; text: string };
 
-// Strict mode'da effect iki kez çalışır; yeni kamera oturumu, öncekinin
-// kapanmasını beklesin diye başlat/durdur işlemlerini tek zincirde sıralıyoruz.
+// In strict mode the effect runs twice; start/stop calls are chained so a new
+// camera session waits for the previous one to close.
 let queue: Promise<unknown> = Promise.resolve();
 
-// Sadece Code128: daha hızlı okur, başka barkod/QR yanlış pozitiflerini eler.
+// Code128 only: faster decoding and no false positives from other barcodes/QR codes.
 async function createScanner(elementId: string): Promise<Html5Qrcode> {
   const { Html5Qrcode, Html5QrcodeSupportedFormats } = await import("html5-qrcode");
   const config: Html5QrcodeFullConfig = {
     verbose: false,
     formatsToSupport: [Html5QrcodeSupportedFormats.CODE_128],
-    // Android Chrome'un yerleşik BarcodeDetector'ı varsa onu kullanır; 1D okumada belirgin şekilde iyi.
+    // Uses Android Chrome's built-in BarcodeDetector when available; noticeably better for 1D codes.
     experimentalFeatures: { useBarCodeDetectorIfSupported: true },
   };
   return new Html5Qrcode(elementId, config);
@@ -41,7 +41,7 @@ export default function Scanner() {
   const router = useRouter();
   const [status, setStatus] = useState<Status>({ kind: "info", text: "Kamera açılıyor…" });
   const busy = useRef(false);
-  // Kameradan gelen tek bir yanlış kareye güvenmemek için aynı değeri art arda iki kez görmeyi bekliyoruz.
+  // Require the same value twice in a row so a single misread camera frame isn't trusted.
   const lastRead = useRef<{ value: string; at: number } | null>(null);
 
   const handleResult = useCallback(
@@ -65,13 +65,13 @@ export default function Scanner() {
         if (id) {
           setStatus({ kind: "info", text: "Ürün bulundu, yönlendiriliyor…" });
           router.push(`/items/${id}`);
-          return; // busy açık kalır; sayfa değişiyor
+          return; // keep busy set; the page is navigating away
         }
         setStatus({ kind: "error", text: `Barkod bulunamadı: ${value}` });
       } catch (err) {
         setStatus({ kind: "error", text: `Kontrol sırasında hata: ${String(err)}` });
       }
-      // Aynı barkodun saniyede 10 kez tetiklenmemesi için kısa bekleme, sonra tekrar okumaya izin ver.
+      // Short cooldown so the same barcode doesn't fire 10 times a second, then allow scanning again.
       setTimeout(() => {
         busy.current = false;
       }, 2000);
@@ -79,7 +79,7 @@ export default function Scanner() {
     [router]
   );
 
-  // Kamera callback'i ilk render'daki fonksiyonu tutar; güncelini ref'ten okuyalım.
+  // The camera callback captures the first render's function; read the latest one from a ref.
   const handleRef = useRef(handleResult);
   handleRef.current = handleResult;
 
@@ -103,22 +103,22 @@ export default function Scanner() {
           { facingMode: "environment" },
           {
             fps: 10,
-            // Varsayılan düşük çözünürlükte ince 1D çizgiler uzaktan seçilemiyor; yüksek çözünürlük + sürekli odak iste.
-            // Desteklemeyen cihaz "ideal" değerleri yok sayar, hata vermez.
+            // At the default low resolution thin 1D bars can't be resolved from a distance; ask for high resolution + continuous focus.
+            // Devices that don't support these ignore the "ideal" values without erroring.
             videoConstraints: {
               facingMode: "environment",
               width: { ideal: 1920 },
               height: { ideal: 1080 },
               advanced: [{ focusMode: "continuous" } as MediaTrackConstraintSet],
             },
-            // 1D barkod için yatay dikdörtgen; dar ekranda genişliğe sığdır.
+            // Wide rectangle for 1D barcodes; fit to width on narrow screens.
             qrbox: (viewfinderWidth) => {
               const width = Math.floor(Math.min(300, viewfinderWidth * 0.9));
               return { width, height: Math.floor(width * 0.4) };
             },
           },
           (text) => handleRef.current(text),
-          () => {} // her karede "barkod yok" hatası gelir; yok say
+          () => {} // fires a "no barcode" error every frame; ignore
         );
         if (!cancelled) setStatus({ kind: "info", text: "Barkodu yatay tutarak kameraya gösterin." });
       } catch (err) {
@@ -134,7 +134,7 @@ export default function Scanner() {
         try {
           scanner?.clear();
         } catch {
-          // zaten temizlenmiş
+          // already cleared
         }
       });
     };
@@ -147,7 +147,7 @@ export default function Scanner() {
     try {
       const text = await (await createScanner("reader-file")).scanFile(file, false);
       busy.current = false;
-      await handleRef.current(text, true); // fotoğraf tek karedir; teyit beklemeye gerek yok
+      await handleRef.current(text, true); // a photo is a single frame; no confirmation needed
     } catch {
       setStatus({ kind: "error", text: "Fotoğrafta barkod bulunamadı." });
     }

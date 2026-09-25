@@ -38,7 +38,7 @@ export async function updateSalePrice(auctionItemId: string, auctionId: string, 
   const satisFiyati = num(formData, "satis_fiyati");
 
   const supabase = createClient();
-  // Fiyat girildiyse ürün satılmış demektir; boş bırakılırsa sadece fiyat silinir.
+  // Entering a price means the item sold; clearing it only removes the price.
   const { data, error } = await supabase
     .from("auction_items")
     .update(satisFiyati === null ? { satis_fiyati: null } : { satis_fiyati: satisFiyati, satildi_mi: true })

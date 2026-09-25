@@ -16,7 +16,7 @@ export default async function AuctionDetailPage({ params }: { params: { id: stri
     .select("*")
     .eq("id", params.id)
     .maybeSingle<Auction>();
-  // Geçersiz uuid'de Postgres 22P02 döner; onu da 404 say.
+  // Postgres returns 22P02 for an invalid uuid; treat that as 404 too.
   if (aErr?.code === "22P02") notFound();
   if (aErr) throw new Error(aErr.message);
   if (!auction) notFound();

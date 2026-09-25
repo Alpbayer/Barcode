@@ -1,7 +1,7 @@
 import JsBarcode from "jsbarcode";
 import { DOMImplementation, XMLSerializer } from "@xmldom/xmldom";
 
-// Sunucuda DOM yok; jsbarcode'a xmldom ile sahte bir SVG document veriyoruz.
+// There's no DOM on the server; give jsbarcode a fake SVG document via xmldom.
 export function barcodeDataUrl(value: number | string) {
   const doc = new DOMImplementation().createDocument("http://www.w3.org/1999/xhtml", "html", null);
   const svg = doc.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -11,10 +11,10 @@ export function barcodeDataUrl(value: number | string) {
     format: "CODE128",
     width: 3,
     height: 90,
-    // Code128 standardı her iki yanda en az 10 modül boşluk (quiet zone) ister: 10 × width.
-    // Dar olursa okuyucu yandaki görüntüyü barkodun parçası sanıp yanlış okur.
+    // The Code128 spec requires a quiet zone of at least 10 modules on each side: 10 × width.
+    // If it's narrower, scanners mistake nearby content for part of the barcode and misread.
     margin: 30,
-    displayValue: true, // okunabilir sayıyı barkodun altına basar
+    displayValue: true, // prints the human-readable number under the barcode
     fontSize: 18,
   });
 

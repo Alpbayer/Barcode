@@ -2,9 +2,9 @@
 
 import { createClient } from "@/lib/supabase/server";
 
-// Okunan barkod numarasına ait ürünün id'sini döner; yoksa null.
+// Returns the id of the item with the scanned barcode number, or null.
 export async function findItemByBarcode(raw: string): Promise<string | null> {
-  // Sadece rakam değilse (başka bir barkod/QR) DB'ye hiç sorma.
+  // Not digits only (some other barcode/QR): don't query the DB at all.
   if (!/^\d+$/.test(raw)) return null;
 
   const supabase = createClient();

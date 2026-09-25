@@ -1,3 +1,3 @@
--- Faz 2: items'a kısa, otomatik artan barkod numarası (Code128'de bu basılır).
--- Supabase SQL Editor'da bir kez çalıştırın. Mevcut satırlar da otomatik numara alır.
+-- Phase 2: short auto-incrementing barcode number on items (this is what the Code128 encodes).
+-- Run once in the Supabase SQL Editor. Existing rows get numbers automatically too.
 alter table items add column barcode_value bigint generated always as identity unique;
