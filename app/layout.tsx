@@ -1,10 +1,18 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import Link from "next/link";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Barcode",
   description: "Müzayede envanter takibi",
+  // iOS ignores the web manifest for home-screen apps; these tags cover it.
+  appleWebApp: { capable: true, title: "Barcode", statusBarStyle: "default" },
+  // Setting icons here disables Next's automatic app/icon.png link, so list it too.
+  icons: { icon: "/icon.png", apple: "/icons/apple-touch-icon.png" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#000000",
 };
 
 export default function RootLayout({
