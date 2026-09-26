@@ -16,7 +16,10 @@ export default async function AuctionsPage() {
 
   return (
     <main className="space-y-6">
-      <h1 className="text-2xl font-bold">Müzayedeler</h1>
+      <div className="flex items-center gap-4">
+        <h1 className="text-2xl font-bold">Müzayedeler</h1>
+        <Link href="/auctions/upload" className="bg-black px-3 py-1 text-white">Excel&apos;den yükle</Link>
+      </div>
 
       <form action={createAuction} className="flex flex-wrap items-end gap-2 border p-3">
         <label className="flex flex-col text-sm">

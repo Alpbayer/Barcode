@@ -39,6 +39,16 @@ export default async function AuctionDetailPage({ params }: { params: { id: stri
         <Link href="/auctions" className="text-sm text-blue-600 underline">← Müzayedeler</Link>
         <h1 className="text-2xl font-bold">{auction.name}</h1>
         <p className="text-gray-600">Tarih: {auction.date ?? "-"} · {rows.length} ürün</p>
+        <div className="mt-2 flex gap-2">
+          <Link href={`/auctions/upload?auction=${auction.id}`} className="border px-3 py-1 text-sm">
+            Excel&apos;den ürün ekle
+          </Link>
+          {rows.length > 0 && (
+            <Link href={`/items/print?auction=${auction.id}`} className="border px-3 py-1 text-sm">
+              Etiketleri yazdır
+            </Link>
+          )}
+        </div>
       </div>
 
       {rows.length === 0 ? (

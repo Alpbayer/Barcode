@@ -1,9 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
 import type { Html5Qrcode, Html5QrcodeFullConfig } from "html5-qrcode";
-import { findItemByBarcode } from "./actions";
+import { getScanResult, setSold, type ScanResult } from "./actions";
 
 type Status = { kind: "info" | "error"; text: string };
 
@@ -38,46 +38,53 @@ function cameraErrorMessage(err: unknown): string {
 }
 
 export default function Scanner() {
-  const router = useRouter();
   const [status, setStatus] = useState<Status>({ kind: "info", text: "Kamera açılıyor…" });
+  const [result, setResult] = useState<ScanResult | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const busy = useRef(false);
+  const scannerRef = useRef<Html5Qrcode | null>(null);
   // Require the same value twice in a row so a single misread camera frame isn't trusted.
   const lastRead = useRef<{ value: string; at: number } | null>(null);
 
-  const handleResult = useCallback(
-    async (raw: string, confirmed = false) => {
-      if (busy.current) return;
-      const value = raw.trim();
+  const handleResult = useCallback(async (raw: string, confirmed = false) => {
+    if (busy.current) return;
+    const value = raw.trim();
 
-      if (!confirmed) {
-        const prev = lastRead.current;
-        const now = Date.now();
-        lastRead.current = { value, at: now };
-        if (!prev || prev.value !== value || now - prev.at > 1500) return;
-      }
+    if (!confirmed) {
+      const prev = lastRead.current;
+      const now = Date.now();
+      lastRead.current = { value, at: now };
+      if (!prev || prev.value !== value || now - prev.at > 1500) return;
+    }
 
-      busy.current = true;
-      lastRead.current = null;
-      setStatus({ kind: "info", text: "Kontrol ediliyor…" });
+    busy.current = true;
+    lastRead.current = null;
+    setStatus({ kind: "info", text: "Kontrol ediliyor…" });
 
-      try {
-        const id = await findItemByBarcode(value);
-        if (id) {
-          setStatus({ kind: "info", text: "Ürün bulundu, yönlendiriliyor…" });
-          router.push(`/items/${id}`);
-          return; // keep busy set; the page is navigating away
+    try {
+      const found = await getScanResult(value);
+      if (found) {
+        // Freeze the camera while the panel is open; "Yeni tara" resumes it.
+        try {
+          scannerRef.current?.pause(true);
+        } catch {
+          // not scanning (e.g. photo upload path)
         }
-        setStatus({ kind: "error", text: `Barkod bulunamadı: ${value}` });
-      } catch (err) {
-        setStatus({ kind: "error", text: `Kontrol sırasında hata: ${String(err)}` });
+        setSaveError(null);
+        setResult(found);
+        setStatus({ kind: "info", text: "" });
+        return; // keep busy set until "Yeni tara"
       }
-      // Short cooldown so the same barcode doesn't fire 10 times a second, then allow scanning again.
-      setTimeout(() => {
-        busy.current = false;
-      }, 2000);
-    },
-    [router]
-  );
+      setStatus({ kind: "error", text: `Barkod bulunamadı: ${value}` });
+    } catch (err) {
+      setStatus({ kind: "error", text: `Kontrol sırasında hata: ${String(err)}` });
+    }
+    // Short cooldown so the same barcode doesn't fire 10 times a second, then allow scanning again.
+    setTimeout(() => {
+      busy.current = false;
+    }, 2000);
+  }, []);
 
   // The camera callback captures the first render's function; read the latest one from a ref.
   const handleRef = useRef(handleResult);
@@ -98,6 +105,7 @@ export default function Scanner() {
       }
       scanner = await createScanner("reader");
       if (cancelled) return;
+      scannerRef.current = scanner;
       try {
         await scanner.start(
           { facingMode: "environment" },
@@ -129,6 +137,7 @@ export default function Scanner() {
 
     return () => {
       cancelled = true;
+      if (scannerRef.current === scanner) scannerRef.current = null;
       queue = run.then(async () => {
         if (scanner?.isScanning) await scanner.stop().catch(() => {});
         try {
@@ -139,6 +148,36 @@ export default function Scanner() {
       });
     };
   }, []);
+
+  function scanAgain() {
+    setResult(null);
+    setSaveError(null);
+    setStatus({ kind: "info", text: "Barkodu yatay tutarak kameraya gösterin." });
+    try {
+      scannerRef.current?.resume();
+    } catch {
+      // wasn't paused
+    }
+    busy.current = false;
+  }
+
+  async function toggleSold() {
+    const target = result?.entries[0];
+    if (!result || !target) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const saved = await setSold(target.id, !target.satildi_mi);
+      setResult({
+        ...result,
+        entries: result.entries.map((e, i) => (i === 0 ? { ...e, satildi_mi: saved } : e)),
+      });
+    } catch (err) {
+      setSaveError(`Kaydedilemedi: ${String(err)}`);
+    } finally {
+      setSaving(false);
+    }
+  }
 
   async function onFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -153,17 +192,87 @@ export default function Scanner() {
     }
   }
 
+  const target = result?.entries[0];
+  const older = result?.entries.slice(1) ?? [];
+
   return (
     <div className="space-y-3">
-      <div id="reader" className="w-full overflow-hidden border" />
+      {result && (
+        <section className="space-y-3 border-2 border-black p-4">
+          <div>
+            <h2 className="text-xl font-bold">{result.item.baslik}</h2>
+            <p className="text-sm text-gray-600">
+              LotNo {result.item.lot_no ?? "-"} · {result.item.kategori ?? "Kategorisiz"} · Barkod{" "}
+              {result.item.barcode_value}
+            </p>
+          </div>
+
+          {target ? (
+            <>
+              <p className="text-sm">
+                Müzayede: <strong>{target.auctions?.name ?? "-"}</strong>
+                {target.auctions?.date ? ` (${target.auctions.date})` : ""}
+                {target.acilis_fiyati != null ? ` · Açılış ${target.acilis_fiyati}` : ""}
+              </p>
+              <p
+                className={`py-2 text-center text-2xl font-bold text-white ${
+                  target.satildi_mi ? "bg-green-600" : "bg-gray-500"
+                }`}
+              >
+                {target.satildi_mi ? "SATILDI" : "SATILMADI"}
+              </p>
+              <button
+                onClick={toggleSold}
+                disabled={saving}
+                className={`w-full py-4 text-lg font-semibold text-white disabled:opacity-50 ${
+                  target.satildi_mi ? "bg-gray-700" : "bg-green-700"
+                }`}
+              >
+                {saving ? "Kaydediliyor…" : target.satildi_mi ? "Satılmadı olarak işaretle" : "Satıldı olarak işaretle"}
+              </button>
+              {saveError && <p className="text-sm text-red-600">{saveError}</p>}
+
+              {older.length > 0 && (
+                <div className="text-sm">
+                  <p className="font-semibold">Önceki müzayedeler (değiştirilmez):</p>
+                  <ul className="list-inside list-disc">
+                    {older.map((e) => (
+                      <li key={e.id}>
+                        {e.auctions?.name ?? "-"}: {e.satildi_mi ? "Satıldı" : "Satılmadı"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </>
+          ) : (
+            <p className="text-sm text-gray-600">Bu ürün hiçbir müzayedeye eklenmemiş.</p>
+          )}
+
+          <div className="flex gap-2">
+            <button onClick={scanAgain} className="flex-1 bg-black py-3 font-semibold text-white">
+              Yeni tara
+            </button>
+            <Link href={`/items/${result.item.id}`} className="border px-3 py-3 text-sm">
+              Ürün detayı
+            </Link>
+          </div>
+        </section>
+      )}
+
+      <div id="reader" className={`w-full overflow-hidden border ${result ? "hidden" : ""}`} />
       <div id="reader-file" className="hidden" />
 
-      <p className={status.kind === "error" ? "text-red-600" : "text-gray-700"}>{status.text}</p>
+      {status.text && (
+        <p className={status.kind === "error" ? "text-red-600" : "text-gray-700"}>{status.text}</p>
+      )}
 
-      <label className="block text-sm">
-        Kamera çalışmıyorsa fotoğraftan oku:
-        <input type="file" accept="image/*" capture="environment" onChange={onFile} className="mt-1 block" />
-      </label>
+      {!result && (
+        <label className="block text-sm">
+          Kamera çalışmıyorsa fotoğraftan oku:
+          <input type="file" accept="image/*" capture="environment" onChange={onFile} className="mt-1 block" />
+        </label>
+      )}
     </div>
   );
 }

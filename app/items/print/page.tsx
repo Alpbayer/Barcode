@@ -9,22 +9,29 @@ export const dynamic = "force-dynamic";
 export default async function PrintItemsPage({
   searchParams,
 }: {
-  searchParams: { id?: string | string[] };
+  searchParams: { id?: string | string[]; auction?: string };
 }) {
   const requested = searchParams.id === undefined ? [] : [searchParams.id].flat();
   const ids = requested.filter(isUuid);
+  const auctionId = searchParams.auction;
 
   const supabase = createClient();
   let query = supabase
     .from("items")
-    .select("id, lot_no, baslik, barcode_value")
+    // !inner turns the embed into a join so the auction filter below drops non-matching items.
+    .select(auctionId ? "id, lot_no, baslik, barcode_value, auction_items!inner(auction_id)" : "id, lot_no, baslik, barcode_value")
     .order("lot_no", { nullsFirst: false });
+  if (auctionId !== undefined) {
+    // Invalid uuid → match nothing rather than erroring.
+    query = query.eq("auction_items.auction_id", isUuid(auctionId) ? auctionId : "00000000-0000-0000-0000-000000000000");
+  }
   // If a selection was made, show only those (don't fall back to "all" even if filtering invalid ids leaves it empty).
   if (requested.length > 0) query = query.in("id", ids);
   const { data, error } = await query;
   if (error) throw new Error(error.message);
 
-  const items = (data ?? []) as Pick<Item, "id" | "lot_no" | "baslik" | "barcode_value">[];
+  const items = (data ?? []) as unknown as Pick<Item, "id" | "lot_no" | "baslik" | "barcode_value">[];
+  const scope = auctionId !== undefined ? "(müzayede)" : requested.length > 0 ? "(seçilenler)" : "(tümü)";
   const labels = items.map((i) => ({ ...i, barcode: barcodeDataUrl(i.barcode_value) }));
 
   return (
@@ -32,7 +39,7 @@ export default async function PrintItemsPage({
       <div className="flex items-center gap-4 print:hidden">
         <Link href="/items" className="text-sm text-blue-600 underline">← Ürünler</Link>
         <p className="text-sm text-gray-600">
-          {labels.length} etiket {requested.length > 0 ? "(seçilenler)" : "(tümü)"} · Yazdırmak için Ctrl+P
+          {labels.length} etiket {scope} · Yazdırmak için Ctrl+P
         </p>
       </div>
 
