@@ -6,6 +6,8 @@ import { isUuid } from "@/lib/uuid";
 
 export const dynamic = "force-dynamic";
 
+const BATCH = 1000;
+
 export default async function PrintItemsPage({
   searchParams,
 }: {
@@ -16,21 +18,32 @@ export default async function PrintItemsPage({
   const auctionId = searchParams.auction;
 
   const supabase = createClient();
-  let query = supabase
-    .from("items")
-    // !inner turns the embed into a join so the auction filter below drops non-matching items.
-    .select(auctionId ? "id, lot_no, baslik, barcode_value, auction_items!inner(auction_id)" : "id, lot_no, baslik, barcode_value")
-    .order("lot_no", { nullsFirst: false });
-  if (auctionId !== undefined) {
-    // Invalid uuid → match nothing rather than erroring.
-    query = query.eq("auction_items.auction_id", isUuid(auctionId) ? auctionId : "00000000-0000-0000-0000-000000000000");
-  }
-  // If a selection was made, show only those (don't fall back to "all" even if filtering invalid ids leaves it empty).
-  if (requested.length > 0) query = query.in("id", ids);
-  const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  const pageQuery = (from: number) => {
+    let query = supabase
+      .from("items")
+      // !inner turns the embed into a join so the auction filter below drops non-matching items.
+      .select(auctionId ? "id, lot_no, baslik, barcode_value, auction_items!inner(auction_id)" : "id, lot_no, baslik, barcode_value")
+      .order("lot_no", { nullsFirst: false })
+      .order("created_at")
+      .range(from, from + BATCH - 1);
+    if (auctionId !== undefined) {
+      // Invalid uuid → match nothing rather than erroring.
+      query = query.eq("auction_items.auction_id", isUuid(auctionId) ? auctionId : "00000000-0000-0000-0000-000000000000");
+    }
+    // If a selection was made, show only those (don't fall back to "all" even if filtering invalid ids leaves it empty).
+    if (requested.length > 0) query = query.in("id", ids);
+    return query;
+  };
 
-  const items = (data ?? []) as unknown as Pick<Item, "id" | "lot_no" | "baslik" | "barcode_value">[];
+  // Supabase returns at most 1000 rows per request; keep fetching until a short page.
+  type Row = Pick<Item, "id" | "lot_no" | "baslik" | "barcode_value">;
+  const items: Row[] = [];
+  for (let from = 0; ; from += BATCH) {
+    const { data, error } = await pageQuery(from);
+    if (error) throw new Error(error.message);
+    items.push(...((data ?? []) as unknown as Row[]));
+    if (!data || data.length < BATCH) break;
+  }
   const scope = auctionId !== undefined ? "(müzayede)" : requested.length > 0 ? "(seçilenler)" : "(tümü)";
   const labels = items.map((i) => ({ ...i, barcode: barcodeDataUrl(i.barcode_value) }));
 

@@ -2,7 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import type { Auction, AuctionItem, Item } from "@/lib/types";
-import { addItemToAuction, toggleSold, updateSalePrice } from "../actions";
+import ConfirmForm from "@/components/ConfirmForm";
+import { addItemToAuction, deleteAuction, toggleSold, updateSalePrice } from "../actions";
 
 export const dynamic = "force-dynamic";
 
@@ -114,7 +115,11 @@ export default async function AuctionDetailPage({ params }: { params: { id: stri
         <h2 className="mb-2 font-semibold">Müzayedeye ürün ekle</h2>
         {allItems.length === 0 ? (
           <p className="text-sm text-gray-500">
-            Önce <Link href="/items/new" className="text-blue-600 underline">ürün ekleyin</Link>.
+            Henüz ürün yok.{" "}
+            <Link href={`/auctions/upload?auction=${auction.id}`} className="text-blue-600 underline">
+              Excel&apos;den yükleyin
+            </Link>
+            .
           </p>
         ) : (
           <form action={addItemToAuction.bind(null, params.id)} className="flex flex-wrap items-end gap-2">
@@ -141,6 +146,23 @@ export default async function AuctionDetailPage({ params }: { params: { id: stri
             <button className="bg-black px-3 py-1 text-white">Ekle</button>
           </form>
         )}
+      </section>
+
+      <section className="border border-red-300 p-3">
+        <ConfirmForm
+          action={deleteAuction.bind(null, auction.id)}
+          message={`"${auction.name}" müzayedesi silinsin mi? Bu işlem geri alınamaz.`}
+          className="flex flex-wrap items-center gap-3"
+        >
+          <button className="bg-red-600 px-3 py-1 text-white">Müzayedeyi sil</button>
+          <label className="flex items-center gap-1 text-sm">
+            <input type="checkbox" name="with_items" />
+            Ürünlerini de sil (başka müzayedede olmayanlar)
+          </label>
+        </ConfirmForm>
+        <p className="mt-1 text-xs text-gray-500">
+          Kutu işaretli değilse sadece müzayede ve bu müzayededeki satış kayıtları silinir; ürünler kalır.
+        </p>
       </section>
     </main>
   );

@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+import ConfirmForm from "@/components/ConfirmForm";
 import { barcodeDataUrl } from "@/lib/barcode";
+import { deleteItem } from "../actions";
 import { createClient } from "@/lib/supabase/server";
 import type { Auction, AuctionItem, Item } from "@/lib/types";
 
@@ -96,6 +98,17 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
             </tbody>
           </table>
         )}
+      </section>
+
+      <section className="border border-red-300 p-3">
+        <ConfirmForm
+          action={deleteItem.bind(null, item.id)}
+          message={`"${item.baslik}" silinsin mi?${
+            item.auction_items.length > 0 ? ` ${item.auction_items.length} müzayede kaydı da silinecek.` : ""
+          } Bu işlem geri alınamaz.`}
+        >
+          <button className="bg-red-600 px-3 py-1 text-white">Ürünü sil</button>
+        </ConfirmForm>
       </section>
     </main>
   );
