@@ -10,8 +10,8 @@ export type ScanEntry = Pick<AuctionItem, "id" | "satildi_mi" | "acilis_fiyati" 
 
 export type ScanResult = {
   item: Pick<Item, "id" | "baslik" | "lot_no" | "kategori" | "barcode_value">;
-  // Storage path of the first photo, shown so the user can confirm it's the right item.
-  photoPath: string | null;
+  // Storage paths of the item's photos in order (photo 1 first), swipeable on the scan card.
+  photoPaths: string[];
   // Newest auction_items first; entries[0] is the one the sold button acts on.
   entries: ScanEntry[];
 };
@@ -37,8 +37,8 @@ export async function getScanResult(raw: string): Promise<ScanResult | null> {
     auction_items: ScanEntry[];
     item_photos: { position: number; path: string }[];
   };
-  const photoPath = item_photos.find((p) => p.position === 1)?.path ?? item_photos[0]?.path ?? null;
-  return { item, photoPath, entries: auction_items };
+  const photoPaths = [...item_photos].sort((a, b) => a.position - b.position).map((p) => p.path);
+  return { item, photoPaths, entries: auction_items };
 }
 
 // Sets satildi_mi on one auction_items row and returns the saved value.

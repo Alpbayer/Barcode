@@ -38,6 +38,37 @@ function cameraErrorMessage(err: unknown): string {
   return `Kamera açılamadı: ${text}`;
 }
 
+// Horizontal swipe between photos using native scroll snapping, with a "1/2" indicator.
+function PhotoSwiper({ paths, alt }: { paths: string[]; alt: string }) {
+  const [index, setIndex] = useState(0);
+  return (
+    <div className="relative">
+      <div
+        className="flex snap-x snap-mandatory overflow-x-auto border bg-gray-50"
+        onScroll={(e) => {
+          const el = e.currentTarget;
+          setIndex(Math.round(el.scrollLeft / el.clientWidth));
+        }}
+      >
+        {paths.map((path, i) => (
+          // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL, no next/image optimizer configured
+          <img
+            key={path}
+            src={photoUrl(path)}
+            alt={`${alt} – foto ${i + 1}`}
+            className="h-56 w-full shrink-0 snap-center object-contain"
+          />
+        ))}
+      </div>
+      {paths.length > 1 && (
+        <span className="absolute bottom-2 right-2 rounded bg-black/60 px-2 py-0.5 text-xs text-white">
+          {index + 1}/{paths.length} · kaydır
+        </span>
+      )}
+    </div>
+  );
+}
+
 export default function Scanner() {
   const [status, setStatus] = useState<Status>({ kind: "info", text: "Kamera açılıyor…" });
   const [result, setResult] = useState<ScanResult | null>(null);
@@ -200,14 +231,7 @@ export default function Scanner() {
     <div className="space-y-3">
       {result && (
         <section className="space-y-3 border-2 border-black p-4">
-          {result.photoPath && (
-            // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL, no next/image optimizer configured
-            <img
-              src={photoUrl(result.photoPath)}
-              alt={result.item.baslik}
-              className="max-h-56 w-full border bg-gray-50 object-contain"
-            />
-          )}
+          {result.photoPaths.length > 0 && <PhotoSwiper paths={result.photoPaths} alt={result.item.baslik} />}
           <div>
             <h2 className="text-xl font-bold">{result.item.baslik}</h2>
             <p className="text-sm text-gray-600">
