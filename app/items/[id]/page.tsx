@@ -4,19 +4,21 @@ import ConfirmForm from "@/components/ConfirmForm";
 import { barcodeDataUrl } from "@/lib/barcode";
 import { deleteItem } from "../actions";
 import { createClient } from "@/lib/supabase/server";
-import type { Auction, AuctionItem, Item } from "@/lib/types";
+import { photoUrl } from "@/lib/photos";
+import type { Auction, AuctionItem, Item, ItemPhoto } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
 
 type ItemWithAuctions = Item & {
   auction_items: (AuctionItem & { auctions: Pick<Auction, "id" | "name" | "date"> | null })[];
+  item_photos: Pick<ItemPhoto, "position" | "path">[];
 };
 
 export default async function ItemDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
   const { data: item, error } = await supabase
     .from("items")
-    .select("*, auction_items(*, auctions(id, name, date))")
+    .select("*, auction_items(*, auctions(id, name, date)), item_photos(position, path)")
     .eq("id", params.id)
     .maybeSingle<ItemWithAuctions>();
   // Postgres returns 22P02 for an invalid uuid; treat that as 404 too.
@@ -49,6 +51,25 @@ export default async function ItemDetailPage({ params }: { params: { id: string 
         <img src={barcode} alt={`Barkod ${item.barcode_value}`} className="h-28 border" />
       ) : (
         <p className="text-sm text-red-600">Barkod numarası yok (supabase/faz2_barcode.sql çalıştırılmamış).</p>
+      )}
+
+      {item.item_photos.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {[...item.item_photos]
+            .sort((a, b) => a.position - b.position)
+            .map((p) => (
+              // Originals are large; open full size in a new tab, show a bounded preview here.
+              <a key={p.position} href={photoUrl(p.path)} target="_blank" rel="noreferrer">
+                {/* eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL, no next/image optimizer configured */}
+                <img
+                  src={photoUrl(p.path)}
+                  alt={`${item.baslik} – foto ${p.position}`}
+                  loading="lazy"
+                  className="h-64 max-w-full border object-contain"
+                />
+              </a>
+            ))}
+        </div>
       )}
 
       <dl className="grid max-w-xl grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">

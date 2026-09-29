@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { Html5Qrcode, Html5QrcodeFullConfig } from "html5-qrcode";
+import { photoUrl } from "@/lib/photos";
 import { getScanResult, setSold, type ScanResult } from "./actions";
 
 type Status = { kind: "info" | "error"; text: string };
@@ -199,6 +200,14 @@ export default function Scanner() {
     <div className="space-y-3">
       {result && (
         <section className="space-y-3 border-2 border-black p-4">
+          {result.photoPath && (
+            // eslint-disable-next-line @next/next/no-img-element -- Supabase Storage URL, no next/image optimizer configured
+            <img
+              src={photoUrl(result.photoPath)}
+              alt={result.item.baslik}
+              className="max-h-56 w-full border bg-gray-50 object-contain"
+            />
+          )}
           <div>
             <h2 className="text-xl font-bold">{result.item.baslik}</h2>
             <p className="text-sm text-gray-600">

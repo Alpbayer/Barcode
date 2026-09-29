@@ -7,7 +7,7 @@ import { addItemToAuction, deleteAuction, toggleSold, updateSalePrice } from "..
 
 export const dynamic = "force-dynamic";
 
-type Row = AuctionItem & { items: Item | null };
+type Row = AuctionItem & { items: (Item & { item_photos: { position: number }[] }) | null };
 
 export default async function AuctionDetailPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -23,7 +23,7 @@ export default async function AuctionDetailPage({ params }: { params: { id: stri
   if (!auction) notFound();
 
   const [{ data: rowsData, error: rErr }, { data: itemsData, error: iErr }] = await Promise.all([
-    supabase.from("auction_items").select("*, items(*)").eq("auction_id", params.id),
+    supabase.from("auction_items").select("*, items(*, item_photos(position))").eq("auction_id", params.id),
     supabase.from("items").select("id, lot_no, baslik").order("lot_no", { nullsFirst: false }),
   ]);
   if (rErr) throw new Error(rErr.message);
@@ -45,9 +45,14 @@ export default async function AuctionDetailPage({ params }: { params: { id: stri
             Excel&apos;den ürün ekle
           </Link>
           {rows.length > 0 && (
-            <Link href={`/items/print?auction=${auction.id}`} className="border px-3 py-1 text-sm">
-              Etiketleri yazdır
-            </Link>
+            <>
+              <Link href={`/auctions/${auction.id}/photos`} className="border px-3 py-1 text-sm">
+                Fotoğraf yükle
+              </Link>
+              <Link href={`/items/print?auction=${auction.id}`} className="border px-3 py-1 text-sm">
+                Etiketleri yazdır
+              </Link>
+            </>
           )}
         </div>
       </div>
@@ -59,6 +64,7 @@ export default async function AuctionDetailPage({ params }: { params: { id: stri
           <thead className="bg-gray-100">
             <tr>
               <th className="p-2">LotNo</th>
+              <th className="p-2">Foto</th>
               <th className="p-2">Kategori</th>
               <th className="p-2">Başlık</th>
               <th className="p-2">Açılış</th>
@@ -71,6 +77,7 @@ export default async function AuctionDetailPage({ params }: { params: { id: stri
             {rows.map((r) => (
               <tr key={r.id} className="border-t">
                 <td className="p-2">{r.items?.lot_no ?? "-"}</td>
+                <td className="p-2">{r.items?.item_photos.length || "-"}</td>
                 <td className="p-2">{r.items?.kategori ?? "-"}</td>
                 <td className="p-2">
                   {r.items ? (

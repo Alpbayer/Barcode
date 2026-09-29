@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { chunk } from "@/lib/chunk";
+import { removeItemPhotoFiles } from "@/lib/photos";
 import { createClient } from "@/lib/supabase/server";
 import { num, str } from "@/lib/form";
 
@@ -37,6 +38,7 @@ export async function deleteAuction(auctionId: string, formData: FormData) {
   const { error: aErr } = await supabase.from("auctions").delete().eq("id", auctionId);
   if (aErr) throw new Error(aErr.message);
 
+  await removeItemPhotoFiles(supabase, orphanIds);
   for (const ids of chunk(orphanIds)) {
     const { error: iErr } = await supabase.from("items").delete().in("id", ids);
     if (iErr) throw new Error(iErr.message);

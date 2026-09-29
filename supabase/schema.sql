@@ -35,3 +35,14 @@ create table auction_items (
 alter table auctions      disable row level security;
 alter table items         disable row level security;
 alter table auction_items disable row level security;
+
+-- Photos (phase 5) — see supabase/faz5_photos.sql for the Storage bucket and policy.
+create table item_photos (
+  id uuid primary key default gen_random_uuid(),
+  item_id uuid not null references items(id) on delete cascade,
+  position smallint not null check (position in (1, 2)), -- 1 = N.jpg, 2 = N-2.jpg
+  path text not null,                                     -- object path inside the item-photos bucket
+  created_at timestamptz default now(),
+  unique (item_id, position)
+);
+alter table item_photos disable row level security;

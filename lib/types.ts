@@ -17,6 +17,14 @@ export type Item = {
   created_at: string;
 };
 
+export type ItemPhoto = {
+  id: string;
+  item_id: string;
+  position: 1 | 2;
+  path: string;
+  created_at: string;
+};
+
 export type AuctionItem = {
   id: string;
   auction_id: string;

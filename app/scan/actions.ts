@@ -10,6 +10,8 @@ export type ScanEntry = Pick<AuctionItem, "id" | "satildi_mi" | "acilis_fiyati" 
 
 export type ScanResult = {
   item: Pick<Item, "id" | "baslik" | "lot_no" | "kategori" | "barcode_value">;
+  // Storage path of the first photo, shown so the user can confirm it's the right item.
+  photoPath: string | null;
   // Newest auction_items first; entries[0] is the one the sold button acts on.
   entries: ScanEntry[];
 };
@@ -23,7 +25,7 @@ export async function getScanResult(raw: string): Promise<ScanResult | null> {
   const { data, error } = await supabase
     .from("items")
     .select(
-      "id, baslik, lot_no, kategori, barcode_value, auction_items(id, satildi_mi, acilis_fiyati, satis_fiyati, created_at, auctions(id, name, date))"
+      "id, baslik, lot_no, kategori, barcode_value, auction_items(id, satildi_mi, acilis_fiyati, satis_fiyati, created_at, auctions(id, name, date)), item_photos(position, path)"
     )
     .eq("barcode_value", Number(raw))
     .order("created_at", { referencedTable: "auction_items", ascending: false })
@@ -31,8 +33,12 @@ export async function getScanResult(raw: string): Promise<ScanResult | null> {
   if (error) throw new Error(error.message);
   if (!data) return null;
 
-  const { auction_items, ...item } = data as unknown as ScanResult["item"] & { auction_items: ScanEntry[] };
-  return { item, entries: auction_items };
+  const { auction_items, item_photos, ...item } = data as unknown as ScanResult["item"] & {
+    auction_items: ScanEntry[];
+    item_photos: { position: number; path: string }[];
+  };
+  const photoPath = item_photos.find((p) => p.position === 1)?.path ?? item_photos[0]?.path ?? null;
+  return { item, photoPath, entries: auction_items };
 }
 
 // Sets satildi_mi on one auction_items row and returns the saved value.
