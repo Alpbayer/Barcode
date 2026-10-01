@@ -1,30 +1,15 @@
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 
+// Server-only client using the secret key. RLS is enabled with no policies, so the public anon key
+// can't read or write anything; all data access goes through the server (behind the password gate).
+// SUPABASE_SECRET_KEY has no NEXT_PUBLIC_ prefix, so it never reaches the browser bundle.
 export function createClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-  if (!url?.startsWith("http") || !key || key === "your-anon-key") {
+  const key = process.env.SUPABASE_SECRET_KEY;
+  if (!url?.startsWith("http") || !key) {
     throw new Error(
-      "Supabase ayarları eksik: .env.local içindeki NEXT_PUBLIC_SUPABASE_URL ve NEXT_PUBLIC_SUPABASE_ANON_KEY değerlerini doldurun."
+      "Supabase ayarları eksik: .env.local içindeki NEXT_PUBLIC_SUPABASE_URL ve SUPABASE_SECRET_KEY değerlerini doldurun."
     );
   }
-
-  const cookieStore = cookies();
-  return createServerClient(url, key, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          );
-        } catch {
-          // Cookies can't be set when called from a Server Component; fine since there's no auth.
-        }
-      },
-    },
-  });
+  return createSupabaseClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
 }

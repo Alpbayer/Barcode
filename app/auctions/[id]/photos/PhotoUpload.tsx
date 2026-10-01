@@ -2,10 +2,11 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { chunk } from "@/lib/chunk";
 import { pickPhotos, type PickedPhoto } from "@/lib/photoNames";
 import { PHOTO_BUCKET } from "@/lib/photos";
 import { createClient } from "@/lib/supabase/browser";
-import { savePhotos, type UploadedPhoto } from "./actions";
+import { createUploadTargets, savePhotos, type UploadedPhoto, type UploadTarget } from "./actions";
 
 export type LotInfo = { lotNo: number; itemId: string; photoCount: number };
 
@@ -13,6 +14,7 @@ type Job = PickedPhoto<File> & { itemId: string };
 
 const PARALLEL = 4;
 const SAVE_EVERY = 20;
+const SIGN_BATCH = 20;
 
 // Shortens long LotNo lists for display: "1, 2, 3 … (+40)".
 function shortList(nums: number[], max = 30) {
@@ -25,7 +27,8 @@ export default function PhotoUpload({ auctionId, lots }: { auctionId: string; lo
   const [failed, setFailed] = useState<{ job: Job; error: string }[]>([]);
   const [uploadedCount, setUploadedCount] = useState(0);
   const [fatal, setFatal] = useState<string | null>(null);
-  const uploading = progress !== null && progress.done < progress.total;
+  const [preparing, setPreparing] = useState(false);
+  const uploading = preparing || (progress !== null && progress.done < progress.total);
 
   const plan = useMemo(() => {
     const lotMap = new Map(lots.map((l) => [l.lotNo, l]));
@@ -47,6 +50,25 @@ export default function PhotoUpload({ auctionId, lots }: { auctionId: string; lo
     const supabase = createClient();
     setFatal(null);
     setFailed([]);
+    setProgress(null);
+    setPreparing(true);
+
+    // One-time signed upload URLs from the server (valid ~2 h), fetched in small batches.
+    const targets = new Map<Job, UploadTarget>();
+    try {
+      for (const part of chunk(jobs, SIGN_BATCH)) {
+        const signed = await createUploadTargets(
+          auctionId,
+          part.map((j) => ({ itemId: j.itemId, position: j.position }))
+        );
+        part.forEach((j, i) => targets.set(j, signed[i]));
+      }
+    } catch (err) {
+      setPreparing(false);
+      setFatal(`Yükleme hazırlanamadı: ${String(err)}`);
+      return;
+    }
+    setPreparing(false);
     setProgress({ done: 0, total: jobs.length });
 
     const queue = [...jobs];
@@ -66,13 +88,15 @@ export default function PhotoUpload({ auctionId, lots }: { auctionId: string; lo
 
     const worker = async () => {
       for (let job = queue.shift(); job; job = queue.shift()) {
-        // Unique name per upload so browsers/CDN never show a stale cached photo after a replace.
-        const path = `items/${job.itemId}/${job.position}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`;
+        const target = targets.get(job)!;
         const { error } = await supabase.storage
           .from(PHOTO_BUCKET)
-          .upload(path, job.file, { contentType: job.file.type || "image/jpeg", cacheControl: "31536000" });
+          .uploadToSignedUrl(target.path, target.token, job.file, {
+            contentType: job.file.type || "image/jpeg",
+            cacheControl: "31536000",
+          });
         if (error) errors.push({ job, error: error.message });
-        else pending.push({ item_id: job.itemId, position: job.position, path });
+        else pending.push({ item_id: job.itemId, position: job.position, path: target.path });
         done += 1;
         setProgress({ done, total: jobs.length });
         if (pending.length >= SAVE_EVERY) await flush();
@@ -151,6 +175,8 @@ export default function PhotoUpload({ auctionId, lots }: { auctionId: string; lo
           {plan.jobs.length} fotoğrafı yükle
         </button>
       )}
+
+      {preparing && <p className="text-sm">Yükleme hazırlanıyor…</p>}
 
       {progress && (
         <div className="space-y-1">

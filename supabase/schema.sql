@@ -1,6 +1,6 @@
 -- Barcode — database schema. Run in the Supabase SQL Editor.
--- Note: Supabase enables RLS on new tables automatically. There's no auth yet,
--- so RLS is disabled at the end of this file. It will be re-enabled with policies in the auth phase.
+-- Access model: RLS is ON with no policies, so the public anon key can't touch any table.
+-- The app's server uses SUPABASE_SECRET_KEY (bypasses RLS) behind the site password.
 
 create table auctions (
   id uuid primary key default gen_random_uuid(),
@@ -31,12 +31,13 @@ create table auction_items (
   satis_fiyati numeric,
   created_at timestamptz default now()
 );
--- No auth yet → RLS disabled (read/write with the anon key)
-alter table auctions      disable row level security;
-alter table items         disable row level security;
-alter table auction_items disable row level security;
+alter table auctions      enable row level security;
+alter table items         enable row level security;
+alter table auction_items enable row level security;
 
--- Photos (phase 5) — see supabase/faz5_photos.sql for the Storage bucket and policy.
+-- Photos. Storage: public bucket 'item-photos' with no policies (reads via public URL,
+-- uploads via server-issued signed URLs):
+--   insert into storage.buckets (id, name, public) values ('item-photos', 'item-photos', true);
 create table item_photos (
   id uuid primary key default gen_random_uuid(),
   item_id uuid not null references items(id) on delete cascade,
@@ -45,4 +46,4 @@ create table item_photos (
   created_at timestamptz default now(),
   unique (item_id, position)
 );
-alter table item_photos disable row level security;
+alter table item_photos enable row level security;
