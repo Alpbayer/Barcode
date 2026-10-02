@@ -18,7 +18,7 @@ Next.js · Supabase (PostgreSQL) · Vercel · PWA
 ## Lokal starten
 ```bash
 npm install
-cp .env.example .env.local   # Supabase-Zugangsdaten eintragen
+cp .env.local.example .env.local   # Supabase-Zugangsdaten eintragen
 npm run dev
 ```
 
